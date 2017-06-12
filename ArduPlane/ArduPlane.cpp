@@ -84,7 +84,27 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(dataflash_periodic,     50,    400),
     SCHED_TASK(avoidance_adsb_update,  10,    100),
     SCHED_TASK(button_update,           5,    100),
+
+    SCHED_TASK(gcs_send_auvsi_status, .1,    400),
 };
+
+//AUVSI FAILSAFE
+void Plane::gcs_send_auvsi_status(void){
+
+
+	if(auvsi.is_man_enabled()){
+            gcs_send_text(MAV_SEVERITY_WARNING,"MANUAL TERM ENABLED");
+	} else{
+            gcs_send_text(MAV_SEVERITY_WARNING,"MANUAL TERM DISABLED");
+	}
+
+	if(auvsi.is_auto_enabled()){
+           gcs_send_text(MAV_SEVERITY_WARNING,"AUTO TERM ENABLED");
+	} else{
+           gcs_send_text(MAV_SEVERITY_WARNING,"AUTO TERM DISABLED");
+	}
+}
+
 
 void Plane::setup() 
 {
@@ -289,6 +309,9 @@ void Plane::afs_fs_check(void)
 {
     // perform AFS failsafe checks
     afs.check(failsafe.last_heartbeat_ms, geofence_breached(), failsafe.AFS_last_valid_rc_ms);
+
+    //AUVSI FAILSAFE
+    auvsi.auto_check(failsafe.last_heartbeat_ms,failsafe.AFS_last_valid_rc_ms);
 }
 
 

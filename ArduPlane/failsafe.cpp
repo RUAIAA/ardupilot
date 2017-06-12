@@ -87,6 +87,13 @@ void Plane::failsafe_check(void)
             return;
         }
 
+
+	if(auvsi.should_death_spiral()){
+           gcs_send_text(MAV_SEVERITY_EMERGENCY,"#YOLO, Good-bye from failsafe");
+	   afs.terminate_vehicle();
+	   return;
+	}
+
         if (!demoing_servos) {
             channel_roll->output();
             channel_pitch->output();

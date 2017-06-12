@@ -861,6 +861,13 @@ void Plane::set_servos(void)
         afs.terminate_vehicle();
         return;
     }
+    //AUVSI FAILSAFE
+    //Used to implement the required failsafe protocols for AUVSI SUAS
+    if (auvsi.should_death_spiral()){
+       gcs_send_text(MAV_SEVERITY_EMERGENCY,"#YOLO, Good-bye from attitude");
+       afs.terminate_vehicle();
+       return;
+    }
 
     int16_t last_throttle = channel_throttle->get_radio_out();
 

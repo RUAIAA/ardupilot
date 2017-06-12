@@ -108,6 +108,9 @@
 #include <SITL/SITL.h>
 #endif
 
+//AUVSI FAILSAFE
+#include <AP_AuvsiDeathSpiral/AP_AuvsiDeathSpiral.h>
+
 /*
   a plane specific arming class
  */
@@ -160,6 +163,8 @@ public:
     friend class AP_Tuning_Plane;
     friend class AP_AdvancedFailsafe_Plane;
     friend class AP_Avoidance_Plane;
+    //AUVSI FAILSAFE
+    friend class AP_AuvsiDeathSpiral;
 
     Plane(void);
 
@@ -168,6 +173,9 @@ public:
     void loop() override;
 
 private:
+
+    //AUVSI FAILSAFE
+    AP_AuvsiDeathSpiral auvsi {};
     // key aircraft parameters passed to multiple libraries
     AP_Vehicle::FixedWing aparm;
     AP_HAL::BetterStream* cliSerial;
@@ -1117,6 +1125,9 @@ private:
     void avoid_adsb_run();
 
 public:
+    //AUVSI FAILSAFE
+    void gcs_send_auvsi_status(void);
+
     void mavlink_delay_cb();
     void failsafe_check(void);
     bool print_log_menu(void);

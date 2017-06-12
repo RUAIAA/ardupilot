@@ -1362,6 +1362,10 @@ const AP_Param::Info Plane::var_info[] = {
     // @Group: 
     // @Path: Parameters.cpp
     GOBJECT(g2, "",  ParametersG2),
+
+    // @Group: AUVSI_
+    // @Path: ../libraries/AP_AuvsiDeathSpiral/AP_AuvsiDeathSpiral.cpp
+    GOBJECT(auvsi,"AUVSI_",AP_AuvsiDeathSpiral),
     
     AP_VAREND
 };
