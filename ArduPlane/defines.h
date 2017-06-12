@@ -81,6 +81,7 @@ enum mode_reason_t {
     MODE_REASON_FENCE_BREACH,
     MODE_REASON_AVOIDANCE,
     MODE_REASON_AVOIDANCE_RECOVERY,
+    MODE_REASON_DUAL_FAILSAFE,
 };
 
 // type of stick mixing enabled

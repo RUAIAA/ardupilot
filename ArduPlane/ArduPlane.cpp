@@ -86,7 +86,16 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(button_update,           5,    100),
 
     SCHED_TASK(gcs_send_auvsi_status, .1,    400),
+    SCHED_TASK(check_auvsi_rtl,       10,    100),
 };
+
+
+//AUVSI FAILSAFE
+void Plane::check_auvsi_rtl(void){
+	if(auvsi.rtl_check(failsafe.last_heartbeat_ms,failsafe.AFS_last_valid_rc_ms)){
+		set_mode(RTL,MODE_REASON_DUAL_FAILSAFE);
+	}
+}
 
 //AUVSI FAILSAFE
 void Plane::gcs_send_auvsi_status(void){

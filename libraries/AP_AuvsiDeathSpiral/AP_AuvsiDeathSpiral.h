@@ -1,4 +1,4 @@
-
+#pragma once
 #include <inttypes.h>
 #include <AP_Param/AP_Param.h>
 /*
@@ -12,7 +12,9 @@ class AP_AuvsiDeathSpiral
 {
 
 	protected:
-		
+		//RTL
+		AP_Int8 _double_rtl_enable;
+		AP_Float _double_rtl_timeout;	
 		//needs three enables to trigger AUTO DEATH
 		AP_Int8 _auto_death_enable;
 		AP_Int8 _auto_death_enable2;
@@ -26,7 +28,8 @@ class AP_AuvsiDeathSpiral
 		AP_Int8 _man_death_trigger;
 	
 	private:
-		//int _auto_spiral_state;
+		int _auto_spiral_state;
+		int _double_rtl_state;
 	public:
 		static const struct AP_Param::GroupInfo var_info[];
 		
@@ -40,8 +43,16 @@ class AP_AuvsiDeathSpiral
 			STATE_NO_FAILSAFE =0,
 			STATE_TRIGGERED=1,
 		};
+		enum rtl_state{
+			STATE_NO_RTL=0,
+			STATE_RTL=1,
+		};
+		enum rtl_toggle{
+			AUVSI_RTL_DISABLED =0,
+			AUVSI_RTL_ENABLED=1
+		};
 
-		int _auto_spiral_state;
+	
 
 
 
@@ -58,6 +69,8 @@ class AP_AuvsiDeathSpiral
 	bool should_death_spiral(void);
 	bool is_auto_enabled(void);
 	bool is_man_enabled(void);
+
+	bool rtl_check(uint32_t last_heartbeat_ms,uint32_t last_valid_rc_ms);
 
 
 

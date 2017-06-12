@@ -1127,7 +1127,8 @@ private:
 public:
     //AUVSI FAILSAFE
     void gcs_send_auvsi_status(void);
-
+    //AUVSI FAILSAFE
+    void check_auvsi_rtl(void);
     void mavlink_delay_cb();
     void failsafe_check(void);
     bool print_log_menu(void);
