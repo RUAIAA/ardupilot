@@ -1,4 +1,3 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +24,8 @@ public:
     enum RssiType {
         RSSI_DISABLED           = 0,
         RSSI_ANALOG_PIN         = 1,
-        RSSI_RC_CHANNEL_VALUE   = 2
+        RSSI_RC_CHANNEL_VALUE   = 2,
+        RSSI_RECEIVER           = 3
     };
 
     // constructor

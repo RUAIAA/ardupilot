@@ -37,6 +37,7 @@ public:
     void     resume_timer_procs();
 
     bool     in_timerprocess();
+    bool     in_main_thread() const override;
 
     void     register_timer_failsafe(AP_HAL::Proc, uint32_t period_us);
 
@@ -49,6 +50,8 @@ public:
     uint64_t stopped_clock_usec() const { return _stopped_clock_usec; }
 
     void microsleep(uint32_t usec);
+
+    void teardown();
 
 private:
     class SchedulerThread : public PeriodicThread {
@@ -111,9 +114,11 @@ private:
 
     uint64_t _stopped_clock_usec;
     uint64_t _last_stack_debug_msec;
+    pthread_t _main_ctx;
 
     Semaphore _timer_semaphore;
     Semaphore _io_semaphore;
 };
 
 }
+

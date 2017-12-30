@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <AP_HAL/AP_HAL.h>
+#include <AP_Vehicle/AP_Vehicle_Type.h>
 
 #include "RCInput.h"
 #include "RPIOUARTDriver.h"
@@ -41,6 +42,8 @@ extern const AP_HAL::HAL& hal;
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO ||    \
     CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_ERLEBRAIN2 || \
     CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BH || \
+    CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_DARK || \
+    CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_URUS || \
     CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_PXFMINI
 #define APM_LINUX_RCIN_RATE             2000
 #define APM_LINUX_TONEALARM_RATE        100
@@ -65,6 +68,7 @@ Scheduler::Scheduler()
 
 void Scheduler::init()
 {
+    int ret;
     const struct sched_table {
         const char *name;
         SchedulerThread *thread;
@@ -79,24 +83,32 @@ void Scheduler::init()
         SCHED_THREAD(io, IO),
     };
 
+    _main_ctx = pthread_self();
+
+#if !APM_BUILD_TYPE(APM_BUILD_Replay)
+    // we don't run Replay in real-time...
     mlockall(MCL_CURRENT|MCL_FUTURE);
 
-    if (geteuid() != 0) {
-        printf("WARNING: running as non-root. Will not use realtime scheduling\n");
-    }
-
     struct sched_param param = { .sched_priority = APM_LINUX_MAIN_PRIORITY };
-    sched_setscheduler(0, SCHED_FIFO, &param);
+    if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
+        AP_HAL::panic("Scheduler: failed to set scheduling parameters: %s",
+                      strerror(errno));
+    }
+#endif
 
     /* set barrier to N + 1 threads: worker threads + main */
     unsigned n_threads = ARRAY_SIZE(sched_table) + 1;
-    pthread_barrier_init(&_initialized_barrier, nullptr, n_threads);
+    ret = pthread_barrier_init(&_initialized_barrier, nullptr, n_threads);
+    if (ret) {
+        AP_HAL::panic("Scheduler: Failed to initialise barrier object: %s",
+                      strerror(ret));
+    }
 
     for (size_t i = 0; i < ARRAY_SIZE(sched_table); i++) {
         const struct sched_table *t = &sched_table[i];
 
         t->thread->set_rate(t->rate);
-        t->thread->set_stack_size(256 * 1024);
+        t->thread->set_stack_size(1024 * 1024);
         t->thread->start(t->name, t->policy, t->prio);
     }
 
@@ -268,7 +280,7 @@ void Scheduler::register_timer_failsafe(AP_HAL::Proc failsafe, uint32_t period_u
 
 void Scheduler::suspend_timer_procs()
 {
-    if (!_timer_semaphore.take(0)) {
+    if (!_timer_semaphore.take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
         printf("Failed to take timer semaphore\n");
     }
 }
@@ -287,7 +299,7 @@ void Scheduler::_timer_task()
     }
     _in_timer_proc = true;
 
-    if (!_timer_semaphore.take(0)) {
+    if (!_timer_semaphore.take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
         printf("Failed to take timer semaphore in %s\n", __PRETTY_FUNCTION__);
     }
     // now call the timer based drivers
@@ -321,7 +333,7 @@ void Scheduler::_timer_task()
     _timer_semaphore.give();
 
     // and the failsafe, if one is setup
-    if (_failsafe != NULL) {
+    if (_failsafe != nullptr) {
         _failsafe();
     }
 
@@ -340,7 +352,7 @@ void Scheduler::_timer_task()
 
 void Scheduler::_run_io(void)
 {
-    if (!_io_semaphore.take(0)) {
+    if (!_io_semaphore.take(HAL_SEMAPHORE_BLOCK_FOREVER)) {
         return;
     }
 
@@ -370,6 +382,7 @@ void Scheduler::_run_uarts()
 #else
     UARTDriver::from(hal.uartC)->_timer_tick();
 #endif
+    UARTDriver::from(hal.uartD)->_timer_tick();
     UARTDriver::from(hal.uartE)->_timer_tick();
     UARTDriver::from(hal.uartF)->_timer_tick();
 }
@@ -406,6 +419,11 @@ void Scheduler::_io_task()
 bool Scheduler::in_timerprocess()
 {
     return _in_timer_proc;
+}
+
+bool Scheduler::in_main_thread() const
+{
+    return pthread_equal(pthread_self(), _main_ctx);
 }
 
 void Scheduler::_wait_all_threads()
@@ -453,4 +471,19 @@ bool Scheduler::SchedulerThread::_run()
     _sched._wait_all_threads();
 
     return PeriodicThread::_run();
+}
+
+void Scheduler::teardown()
+{
+    _timer_thread.stop();
+    _io_thread.stop();
+    _rcin_thread.stop();
+    _uart_thread.stop();
+    _tonealarm_thread.stop();
+
+    _timer_thread.join();
+    _io_thread.join();
+    _rcin_thread.join();
+    _uart_thread.join();
+    _tonealarm_thread.join();
 }

@@ -1,5 +1,3 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
 //
 // Simple test for the AP_AHRS interface
 //
@@ -8,6 +6,9 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Module/AP_Module.h>
+
+void setup();
+void loop();
 
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
@@ -27,7 +28,7 @@ void setup(void)
     baro.init();
     ahrs.init();
 
-    gps.init(NULL, serial_manager);
+    gps.init(serial_manager);
 }
 
 void loop(void)

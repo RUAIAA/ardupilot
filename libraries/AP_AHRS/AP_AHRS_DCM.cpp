@@ -1,4 +1,3 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
  *       APM_AHRS_DCM.cpp
  *
@@ -48,7 +47,7 @@ AP_AHRS_DCM::reset_gyro_drift(void)
 
 // run a full DCM update round
 void
-AP_AHRS_DCM::update(void)
+AP_AHRS_DCM::update(bool skip_ins_update)
 {
     float delta_t;
 
@@ -56,8 +55,10 @@ AP_AHRS_DCM::update(void)
         _last_startup_ms = AP_HAL::millis();
     }
 
-    // tell the IMU to grab some data
-    _ins.update();
+    if (!skip_ins_update) {
+        // tell the IMU to grab some data
+        _ins.update();
+    }
 
     // ask the IMU how much time this sensor reading represents
     delta_t = _ins.get_delta_time();
@@ -88,6 +89,9 @@ AP_AHRS_DCM::update(void)
 
     // update trig values including _cos_roll, cos_pitch
     update_trig();
+
+    // update AOA and SSA
+    update_AOA_SSA();
 }
 
 // update the DCM matrix using only the gyros
@@ -944,8 +948,7 @@ void AP_AHRS_DCM::estimate_wind(void)
 void
 AP_AHRS_DCM::euler_angles(void)
 {
-    _body_dcm_matrix = _dcm_matrix;
-    _body_dcm_matrix.rotateXYinv(_trim);
+    _body_dcm_matrix = _dcm_matrix * get_rotation_vehicle_body_to_autopilot_body();
     _body_dcm_matrix.to_euler(&roll, &pitch, &yaw);
 
     update_cd_values();
@@ -962,7 +965,9 @@ bool AP_AHRS_DCM::get_position(struct Location &loc) const
     loc.flags.terrain_alt = 0;
     location_offset(loc, _position_offset_north, _position_offset_east);
     if (_flags.fly_forward && _have_position) {
-        location_update(loc, _gps.ground_course_cd() * 0.01f, _gps.ground_speed() * _gps.get_lag());
+        float gps_delay_sec = 0;
+        _gps.get_lag(gps_delay_sec);
+        location_update(loc, _gps.ground_course_cd() * 0.01f, _gps.ground_speed() * gps_delay_sec);
     }
     return _have_position;
 }
@@ -1003,6 +1008,12 @@ void AP_AHRS_DCM::set_home(const Location &loc)
 {
     _home = loc;
     _home.options = 0;
+}
+
+//  a relative ground position to home in meters, Down
+void AP_AHRS_DCM::get_relative_position_D_home(float &posD) const
+{
+    posD = -_baro.get_altitude();
 }
 
 /*

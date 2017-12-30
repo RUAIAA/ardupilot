@@ -1,4 +1,3 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -25,7 +24,7 @@
 class AP_GPS_Backend
 {
 public:
-	AP_GPS_Backend(AP_GPS &_gps, AP_GPS::GPS_State &_state, AP_HAL::UARTDriver *_port);
+    AP_GPS_Backend(AP_GPS &_gps, AP_GPS::GPS_State &_state, AP_HAL::UARTDriver *_port);
 
     // we declare a virtual destructor so that GPS drivers can
     // override with a custom destructor if need be.
@@ -42,7 +41,7 @@ public:
 
     virtual bool is_configured(void) { return true; }
 
-    virtual void inject_data(uint8_t *data, uint8_t len) { return; }
+    virtual void inject_data(const uint8_t *data, uint16_t len);
 
     //MAVLink methods
     virtual void send_mavlink_gps_rtk(mavlink_channel_t chan) { return ; }
@@ -51,7 +50,16 @@ public:
 
     virtual void broadcast_configuration_failure_reason(void) const { return ; }
 
-    virtual void handle_msg(mavlink_message_t *msg) { return ; }
+    virtual void handle_msg(const mavlink_message_t *msg) { return ; }
+    virtual void handle_gnss_msg(const AP_GPS::GPS_State &msg) { return ; }
+
+    // driver specific lag, returns true if the driver is confident in the provided lag
+    virtual bool get_lag(float &lag) const { lag = 0.2f; return true; }
+
+    virtual const char *name() const = 0;
+
+    void broadcast_gps_type() const;
+    virtual void Write_DataFlash_Log_Startup_messages() const;
 
 protected:
     AP_HAL::UARTDriver *port;           ///< UART we are attached to
@@ -72,4 +80,8 @@ protected:
        assumes MTK19 millisecond form of bcd_time
     */
     void make_gps_time(uint32_t bcd_date, uint32_t bcd_milliseconds);
+
+    void _detection_message(char *buffer, uint8_t buflen) const;
+
+    bool should_df_log() const;
 };

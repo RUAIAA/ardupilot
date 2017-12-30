@@ -1,5 +1,3 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
 #include "Copter.h"
 #include "version.h"
 
@@ -54,14 +52,13 @@ bool Copter::print_log_menu(void)
 #undef PLOG
     }
 
-    cliSerial->println();
+    cliSerial->printf("\n");
 
     DataFlash.ListAvailableLogs(cliSerial);
 
     return(true);
 }
 
-#if CLI_ENABLED == ENABLED
 int8_t Copter::dump_log(uint8_t argc, const Menu::arg *argv)
 {
     int16_t dump_log_num;
@@ -87,13 +84,12 @@ int8_t Copter::dump_log(uint8_t argc, const Menu::arg *argv)
     Log_Read((uint16_t)dump_log_num, dump_log_start, dump_log_end);
     return (0);
 }
-#endif
 
 int8_t Copter::erase_logs(uint8_t argc, const Menu::arg *argv)
 {
-    in_mavlink_delay = true;
+    DataFlash.EnableWrites(false);
     do_erase_logs();
-    in_mavlink_delay = false;
+    DataFlash.EnableWrites(true);
     return 0;
 }
 
@@ -154,9 +150,9 @@ int8_t Copter::process_logs(uint8_t argc, const Menu::arg *argv)
 
 void Copter::do_erase_logs(void)
 {
-    gcs_send_text(MAV_SEVERITY_INFO, "Erasing logs");
+    gcs().send_text(MAV_SEVERITY_INFO, "Erasing logs");
     DataFlash.EraseAll();
-    gcs_send_text(MAV_SEVERITY_INFO, "Log erase complete");
+    gcs().send_text(MAV_SEVERITY_INFO, "Log erase complete");
 }
 
 #if AUTOTUNE_ENABLED == ENABLED
@@ -273,9 +269,9 @@ struct PACKED log_Nav_Tuning {
 // Write an Nav Tuning packet
 void Copter::Log_Write_Nav_Tuning()
 {
-    const Vector3f &pos_target = pos_control.get_pos_target();
-    const Vector3f &vel_target = pos_control.get_vel_target();
-    const Vector3f &accel_target = pos_control.get_accel_target();
+    const Vector3f &pos_target = pos_control->get_pos_target();
+    const Vector3f &vel_target = pos_control->get_vel_target();
+    const Vector3f &accel_target = pos_control->get_accel_target();
     const Vector3f &position = inertial_nav.get_position();
     const Vector3f &velocity = inertial_nav.get_velocity();
 
@@ -327,17 +323,17 @@ void Copter::Log_Write_Control_Tuning()
     struct log_Control_Tuning pkt = {
         LOG_PACKET_HEADER_INIT(LOG_CONTROL_TUNING_MSG),
         time_us             : AP_HAL::micros64(),
-        throttle_in         : attitude_control.get_throttle_in(),
-        angle_boost         : attitude_control.angle_boost(),
-        throttle_out        : motors.get_throttle(),
-        throttle_hover      : motors.get_throttle_hover(),
-        desired_alt         : pos_control.get_alt_target() / 100.0f,
+        throttle_in         : attitude_control->get_throttle_in(),
+        angle_boost         : attitude_control->angle_boost(),
+        throttle_out        : motors->get_throttle(),
+        throttle_hover      : motors->get_throttle_hover(),
+        desired_alt         : pos_control->get_alt_target() / 100.0f,
         inav_alt            : inertial_nav.get_altitude() / 100.0f,
         baro_alt            : baro_alt,
         desired_rangefinder_alt : (int16_t)target_rangefinder_alt,
         rangefinder_alt     : rangefinder_state.alt_cm,
         terr_alt            : terr_alt,
-        target_climb_rate   : (int16_t)pos_control.get_vel_target_z(),
+        target_climb_rate   : (int16_t)pos_control->get_vel_target_z(),
         climb_rate          : climb_rate
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
@@ -353,6 +349,7 @@ struct PACKED log_Performance {
     uint8_t i2c_lockup_count;
     uint16_t ins_error_count;
     uint32_t log_dropped;
+    uint32_t mem_avail;
 };
 
 // Write a performance monitoring packet
@@ -368,6 +365,7 @@ void Copter::Log_Write_Performance()
         i2c_lockup_count : 0,
         ins_error_count  : ins.error_count(),
         log_dropped      : DataFlash.num_dropped() - perf_info_get_num_dropped(),
+        hal.util->available_memory()
     };
     DataFlash.WriteCriticalBlock(&pkt, sizeof(pkt));
 }
@@ -375,10 +373,21 @@ void Copter::Log_Write_Performance()
 // Write an attitude packet
 void Copter::Log_Write_Attitude()
 {
-    Vector3f targets = attitude_control.get_att_target_euler_cd();
+    Vector3f targets = attitude_control->get_att_target_euler_cd();
     targets.z = wrap_360_cd(targets.z);
     DataFlash.Log_Write_Attitude(ahrs, targets);
+    DataFlash.Log_Write_Rate(ahrs, *motors, *attitude_control, *pos_control);
+    if (should_log(MASK_LOG_PID)) {
+        DataFlash.Log_Write_PID(LOG_PIDR_MSG, attitude_control->get_rate_roll_pid().get_pid_info());
+        DataFlash.Log_Write_PID(LOG_PIDP_MSG, attitude_control->get_rate_pitch_pid().get_pid_info());
+        DataFlash.Log_Write_PID(LOG_PIDY_MSG, attitude_control->get_rate_yaw_pid().get_pid_info());
+        DataFlash.Log_Write_PID(LOG_PIDA_MSG, g.pid_accel_z.get_pid_info() );
+    }
+}
 
+// Write an EKF and POS packet
+void Copter::Log_Write_EKF_POS()
+{
  #if OPTFLOW == ENABLED
     DataFlash.Log_Write_EKF(ahrs,optflow.enabled());
  #else
@@ -407,10 +416,10 @@ void Copter::Log_Write_MotBatt()
     struct log_MotBatt pkt_mot = {
         LOG_PACKET_HEADER_INIT(LOG_MOTBATT_MSG),
         time_us         : AP_HAL::micros64(),
-        lift_max        : (float)(motors.get_lift_max()),
-        bat_volt        : (float)(motors.get_batt_voltage_filt()),
-        bat_res         : (float)(motors.get_batt_resistance()),
-        th_limit        : (float)(motors.get_throttle_limit())
+        lift_max        : (float)(motors->get_lift_max()),
+        bat_volt        : (float)(motors->get_batt_voltage_filt()),
+        bat_res         : (float)(motors->get_batt_resistance()),
+        th_limit        : (float)(motors->get_throttle_limit())
     };
     DataFlash.WriteBlock(&pkt_mot, sizeof(pkt_mot));
 #endif
@@ -623,6 +632,12 @@ void Copter::Log_Sensor_Health()
         sensor_health.compass = compass.healthy();
         Log_Write_Error(ERROR_SUBSYSTEM_COMPASS, (sensor_health.compass ? ERROR_CODE_ERROR_RESOLVED : ERROR_CODE_UNHEALTHY));
     }
+
+    // check primary GPS
+    if (sensor_health.primary_gps != gps.primary_sensor()) {
+        sensor_health.primary_gps = gps.primary_sensor();
+        Log_Write_Event(DATA_GPS_PRIMARY_CHANGED);
+    }
 }
 
 struct PACKED log_Heli {
@@ -639,8 +654,8 @@ void Copter::Log_Write_Heli()
     struct log_Heli pkt_heli = {
         LOG_PACKET_HEADER_INIT(LOG_HELI_MSG),
         time_us                 : AP_HAL::micros64(),
-        desired_rotor_speed     : motors.get_desired_rotor_speed(),
-        main_rotor_speed        : motors.get_main_rotor_speed(),
+        desired_rotor_speed     : motors->get_desired_rotor_speed(),
+        main_rotor_speed        : motors->get_main_rotor_speed(),
     };
     DataFlash.WriteBlock(&pkt_heli, sizeof(pkt_heli));
 }
@@ -651,12 +666,11 @@ struct PACKED log_Precland {
     LOG_PACKET_HEADER;
     uint64_t time_us;
     uint8_t healthy;
-    float bf_angle_x;
-    float bf_angle_y;
-    float ef_angle_x;
-    float ef_angle_y;
+    uint8_t target_acquired;
     float pos_x;
     float pos_y;
+    float vel_x;
+    float vel_y;
 };
 
 // Write an optical flow packet
@@ -668,19 +682,20 @@ void Copter::Log_Write_Precland()
         return;
     }
 
-    const Vector2f &bf_angle = precland.last_bf_angle_to_target();
-    const Vector2f &ef_angle = precland.last_ef_angle_to_target();
-    const Vector3f &target_pos_ofs = precland.last_target_pos_offset();
+    Vector2f target_pos_rel = Vector2f(0.0f,0.0f);
+    Vector2f target_vel_rel = Vector2f(0.0f,0.0f);
+    precland.get_target_position_relative_cm(target_pos_rel);
+    precland.get_target_velocity_relative_cms(target_vel_rel);
+
     struct log_Precland pkt = {
         LOG_PACKET_HEADER_INIT(LOG_PRECLAND_MSG),
         time_us         : AP_HAL::micros64(),
         healthy         : precland.healthy(),
-        bf_angle_x      : degrees(bf_angle.x),
-        bf_angle_y      : degrees(bf_angle.y),
-        ef_angle_x      : degrees(ef_angle.x),
-        ef_angle_y      : degrees(ef_angle.y),
-        pos_x           : target_pos_ofs.x,
-        pos_y           : target_pos_ofs.y
+        target_acquired : precland.target_acquired(),
+        pos_x           : target_pos_rel.x,
+        pos_y           : target_pos_rel.y,
+        vel_x           : target_vel_rel.x,
+        vel_y           : target_vel_rel.y
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
  #endif     // PRECISION_LANDING == ENABLED
@@ -750,6 +765,24 @@ void Copter::Log_Write_Throw(ThrowModeStage stage, float velocity, float velocit
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
 
+// Write proximity sensor distances
+void Copter::Log_Write_Proximity()
+{
+#if PROXIMITY_ENABLED == ENABLED
+    DataFlash.Log_Write_Proximity(g2.proximity);
+#endif
+}
+
+// Write beacon position and distances
+void Copter::Log_Write_Beacon()
+{
+    // exit immediately if feature is disabled
+    if (!g2.beacon.enabled()) {
+        return;
+    }
+    DataFlash.Log_Write_Beacon(g2.beacon);
+}
+
 const struct LogStructure Copter::log_structure[] = {
     LOG_COMMON_STRUCTURES,
 #if AUTOTUNE_ENABLED == ENABLED
@@ -767,7 +800,7 @@ const struct LogStructure Copter::log_structure[] = {
     { LOG_CONTROL_TUNING_MSG, sizeof(log_Control_Tuning),
       "CTUN", "Qffffffeccfhh", "TimeUS,ThI,ABst,ThO,ThH,DAlt,Alt,BAlt,DSAlt,SAlt,TAlt,DCRt,CRt" },
     { LOG_PERFORMANCE_MSG, sizeof(log_Performance), 
-      "PM",  "QHHIhBHI",    "TimeUS,NLon,NLoop,MaxT,PMT,I2CErr,INSErr,LogDrop" },
+      "PM",  "QHHIhBHII",    "TimeUS,NLon,NLoop,MaxT,PMT,I2CErr,INSErr,LogDrop,Mem" },
     { LOG_MOTBATT_MSG, sizeof(log_MotBatt),
       "MOTB", "Qffff",  "TimeUS,LiftMax,BatVolt,BatRes,ThLimit" },
     { LOG_EVENT_MSG, sizeof(log_Event),         
@@ -787,7 +820,7 @@ const struct LogStructure Copter::log_structure[] = {
     { LOG_HELI_MSG, sizeof(log_Heli),
       "HELI",  "Qff",         "TimeUS,DRRPM,ERRPM" },
     { LOG_PRECLAND_MSG, sizeof(log_Precland),
-      "PL",    "QBffffff",    "TimeUS,Heal,bX,bY,eX,eY,pX,pY" },
+      "PL",    "QBBffff",    "TimeUS,Heal,TAcq,pX,pY,vX,vY" },
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
       "GUID",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ" },
     { LOG_THROW_MSG, sizeof(log_Throw),
@@ -799,11 +832,12 @@ const struct LogStructure Copter::log_structure[] = {
 void Copter::Log_Read(uint16_t list_entry, uint16_t start_page, uint16_t end_page)
 {
     cliSerial->printf("\n" FIRMWARE_STRING
-                             "\nFree RAM: %u\n"
-                             "\nFrame: " FRAME_CONFIG_STRING "\n",
-                        (unsigned) hal.util->available_memory());
+                        "\nFree RAM: %u\n"
+                        "\nFrame: %s\n",
+                        (unsigned) hal.util->available_memory(),
+                        get_frame_string());
 
-    cliSerial->println(HAL_BOARD_NAME);
+    cliSerial->printf("%s\n", HAL_BOARD_NAME);
 
     DataFlash.LogReadProcess(list_entry, start_page, end_page,
                              FUNCTOR_BIND_MEMBER(&Copter::print_flight_mode, void, AP_HAL::BetterStream *, uint8_t),
@@ -814,45 +848,21 @@ void Copter::Log_Read(uint16_t list_entry, uint16_t start_page, uint16_t end_pag
 void Copter::Log_Write_Vehicle_Startup_Messages()
 {
     // only 200(?) bytes are guaranteed by DataFlash
-    DataFlash.Log_Write_Message("Frame: " FRAME_CONFIG_STRING);
+    DataFlash.Log_Write_MessageF("Frame: %s", get_frame_string());
     DataFlash.Log_Write_Mode(control_mode, control_mode_reason);
+#if AC_RALLY
     DataFlash.Log_Write_Rally(rally);
+#endif
+    Log_Write_Home_And_Origin();
+    gps.Write_DataFlash_Log_Startup_messages();
 }
 
-
-// start a new log
-void Copter::start_logging() 
-{
-    if (g.log_bitmask != 0 && !in_log_download) {
-        if (!ap.logging_started) {
-            ap.logging_started = true;
-            DataFlash.set_mission(&mission);
-            DataFlash.setVehicle_Startup_Log_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
-            DataFlash.StartNewLog();
-        } else if (!DataFlash.logging_started()) {
-            // dataflash may have stopped logging - when we get_log_data,
-            // for example.  Try to restart:
-            DataFlash.StartNewLog();
-        }
-        // enable writes
-        DataFlash.EnableWrites(true);
-    }
-}
 
 void Copter::log_init(void)
 {
     DataFlash.Init(log_structure, ARRAY_SIZE(log_structure));
-    if (!DataFlash.CardInserted()) {
-        gcs_send_text(MAV_SEVERITY_WARNING, "No dataflash card inserted");
-        g.log_bitmask.set(0);
-    } else if (DataFlash.NeedPrep()) {
-        gcs_send_text(MAV_SEVERITY_INFO, "Preparing log system");
-        DataFlash.Prep();
-        gcs_send_text(MAV_SEVERITY_INFO, "Prepared log system");
-        for (uint8_t i=0; i<num_gcs; i++) {
-            gcs[i].reset_cli_timeout();
-        }
-    }
+
+    gcs().reset_cli_timeout();
 }
 
 #else // LOGGING_ENABLED
@@ -876,6 +886,7 @@ void Copter::Log_Write_Nav_Tuning() {}
 void Copter::Log_Write_Control_Tuning() {}
 void Copter::Log_Write_Performance() {}
 void Copter::Log_Write_Attitude(void) {}
+void Copter::Log_Write_EKF_POS() {}
 void Copter::Log_Write_MotBatt() {}
 void Copter::Log_Write_Event(uint8_t id) {}
 void Copter::Log_Write_Data(uint8_t id, int32_t value) {}
@@ -888,7 +899,12 @@ void Copter::Log_Write_Baro(void) {}
 void Copter::Log_Write_Parameter_Tuning(uint8_t param, float tuning_val, int16_t control_in, int16_t tune_low, int16_t tune_high) {}
 void Copter::Log_Write_Home_And_Origin() {}
 void Copter::Log_Sensor_Health() {}
+void Copter::Log_Write_Precland() {}
 void Copter::Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target) {}
+void Copter::Log_Write_Throw(ThrowModeStage stage, float velocity, float velocity_z, float accel, float ef_accel_z, bool throw_detect, bool attitude_ok, bool height_ok, bool pos_ok) {}
+void Copter::Log_Write_Proximity() {}
+void Copter::Log_Write_Beacon() {}
+void Copter::Log_Write_Vehicle_Startup_Messages() {}
 
 #if FRAME_CONFIG == HELI_FRAME
 void Copter::Log_Write_Heli() {}
@@ -898,7 +914,6 @@ void Copter::Log_Write_Heli() {}
 void Copter::Log_Write_Optflow() {}
 #endif
 
-void Copter::start_logging() {}
 void Copter::log_init(void) {}
 
 #endif // LOGGING_ENABLED

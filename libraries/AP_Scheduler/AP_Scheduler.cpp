@@ -1,4 +1,3 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -26,7 +25,7 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <stdio.h>
 
-#if APM_BUILD_TYPE(APM_BUILD_ArduCopter)
+#if APM_BUILD_TYPE(APM_BUILD_ArduCopter) || APM_BUILD_TYPE(APM_BUILD_ArduSub)
 #define SCHEDULER_DEFAULT_LOOP_RATE 400
 #else
 #define SCHEDULER_DEFAULT_LOOP_RATE  50
@@ -94,7 +93,7 @@ void AP_Scheduler::run(uint32_t time_available)
     uint32_t run_started_usec = AP_HAL::micros();
     uint32_t now = run_started_usec;
 
-    if (_debug > 3 && _perf_counters == nullptr) {
+    if (_debug > 1 && _perf_counters == nullptr) {
         _perf_counters = new AP_HAL::Util::perf_counter_t[_num_tasks];
         if (_perf_counters != nullptr) {
             for (uint8_t i=0; i<_num_tasks; i++) {
@@ -115,7 +114,7 @@ void AP_Scheduler::run(uint32_t time_available)
 
             if (dt >= interval_ticks*2) {
                 // we've slipped a whole run of this task!
-                if (_debug > 1) {
+                if (_debug > 4) {
                     ::printf("Scheduler slip task[%u-%s] (%u/%u/%u)\n",
                              (unsigned)i,
                              _tasks[i].name,
@@ -129,11 +128,11 @@ void AP_Scheduler::run(uint32_t time_available)
                 // run it
                 _task_time_started = now;
                 current_task = i;
-                if (_debug > 3 && _perf_counters && _perf_counters[i]) {
+                if (_debug > 1 && _perf_counters && _perf_counters[i]) {
                     hal.util->perf_begin(_perf_counters[i]);
                 }
                 _tasks[i].function();
-                if (_debug > 3 && _perf_counters && _perf_counters[i]) {
+                if (_debug > 1 && _perf_counters && _perf_counters[i]) {
                     hal.util->perf_end(_perf_counters[i]);
                 }
                 current_task = -1;

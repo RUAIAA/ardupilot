@@ -1,4 +1,3 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 //
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -71,7 +70,6 @@
 #endif
 #endif
 
-#define RANGEFINDER_ENABLED ENABLED
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -157,36 +155,10 @@
 
 
 //////////////////////////////////////////////////////////////////////////////
-// THROTTLE_FAILSAFE
-// THROTTLE_FS_VALUE
-// SHORT_FAILSAFE_ACTION
-// LONG_FAILSAFE_ACTION
-#ifndef THROTTLE_FAILSAFE
- # define THROTTLE_FAILSAFE              ENABLED
-#endif
-#ifndef THROTTLE_FS_VALUE
- # define THROTTLE_FS_VALUE              950
-#endif
-#ifndef SHORT_FAILSAFE_ACTION
- # define SHORT_FAILSAFE_ACTION          0
-#endif
-#ifndef LONG_FAILSAFE_ACTION
- # define LONG_FAILSAFE_ACTION           0
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
 // AUTO_TRIM
 //
 #ifndef AUTO_TRIM
  # define AUTO_TRIM                              DISABLED
-#endif
-
-
-//////////////////////////////////////////////////////////////////////////////
-// THROTTLE_OUT
-//
-#ifndef THROTTE_OUT
- # define THROTTLE_OUT                   ENABLED
 #endif
 
 
@@ -298,7 +270,7 @@
  # define THROTTLE_CRUISE                45
 #endif
 #ifndef THROTTLE_MAX
- # define THROTTLE_MAX                   75
+ # define THROTTLE_MAX                   100
 #endif
 
 //////////////////////////////////////////////////////////////////////////////

@@ -1,4 +1,3 @@
-// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -29,7 +28,7 @@ extern const AP_HAL::HAL& hal;
 AP_RangeFinder_LightWareSerial::AP_RangeFinder_LightWareSerial(RangeFinder &_ranger, uint8_t instance,
                                                                RangeFinder::RangeFinder_State &_state,
                                                                AP_SerialManager &serial_manager) :
-    AP_RangeFinder_Backend(_ranger, instance, _state)
+    AP_RangeFinder_Backend(_ranger, instance, _state, MAV_DISTANCE_SENSOR_LASER)
 {
     uart = serial_manager.find_serial(AP_SerialManager::SerialProtocol_Lidar, 0);
     if (uart != nullptr) {

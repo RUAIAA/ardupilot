@@ -2,7 +2,7 @@
  * C preprocesor enumeration of the boards supported by the AP_HAL.
  * This list exists so HAL_BOARD == HAL_BOARD_xxx preprocessor blocks
  * can be used to exclude HAL boards from the build when appropriate.
- * Its not an elegant solution but we can improve it in future.
+ * It's not an elegant solution but we can improve it in future.
  */
 #pragma once
 
@@ -34,10 +34,17 @@
 #define HAL_BOARD_SUBTYPE_LINUX_NAVIO2     1013
 #define HAL_BOARD_SUBTYPE_LINUX_DISCO      1014
 #define HAL_BOARD_SUBTYPE_LINUX_AERO       1015
+#define HAL_BOARD_SUBTYPE_LINUX_DARK       1016
+#define HAL_BOARD_SUBTYPE_LINUX_URUS       1017
+#define HAL_BOARD_SUBTYPE_LINUX_BLUE       1018
 
 /* HAL PX4 sub-types, starting at 2000 */
 #define HAL_BOARD_SUBTYPE_PX4_V1           2000
 #define HAL_BOARD_SUBTYPE_PX4_V2           2001
+#define HAL_BOARD_SUBTYPE_PX4_V4           2002
+#define HAL_BOARD_SUBTYPE_PX4_V3           2003
+#define HAL_BOARD_SUBTYPE_PX4_AEROFC_V1    2004
+#define HAL_BOARD_SUBTYPE_PX4_V4PRO        2005
 
 /* HAL VRBRAIN sub-types, starting at 4000 */
 #define HAL_BOARD_SUBTYPE_VRBRAIN_V45      4000
@@ -65,6 +72,7 @@
 #define HAL_INS_QURT        16
 #define HAL_INS_BBBMINI     17
 #define HAL_INS_AERO        18
+#define HAL_INS_MPU6500     19
 
 /* Barometer driver types */
 #define HAL_BARO_BMP085      1
@@ -77,6 +85,8 @@
 #define HAL_BARO_MS5637_I2C  8
 #define HAL_BARO_QFLIGHT     9
 #define HAL_BARO_QURT       10
+#define HAL_BARO_BMP280_I2C 11
+#define HAL_BARO_BMP280_SPI 12
 
 /* Compass driver types */
 #define HAL_COMPASS_HMC5843             1
@@ -102,8 +112,6 @@
 /* CPU classes, used to select if CPU intensive algorithms should be used
  * Note that these are only approximate, not exact CPU speeds. */
 
-/* DEPRECATED: 16Mhz: AVR2560 or similar */
-#define HAL_CPU_CLASS_16   1
 /* 150Mhz: PX4 or similar. Assumes:
  *  - hardware floating point
  *  - tens of kilobytes of memory available */
@@ -122,51 +130,11 @@
 /* DEFINITIONS FOR BOARDS */
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-#define HAL_BOARD_NAME "SITL"
-#define HAL_CPU_CLASS HAL_CPU_CLASS_1000
-#define HAL_OS_POSIX_IO 1
-#define HAL_OS_SOCKETS 1
-#define HAL_STORAGE_SIZE            16384
-#define HAL_STORAGE_SIZE_AVAILABLE  HAL_STORAGE_SIZE
-#define HAL_BOARD_LOG_DIRECTORY "logs"
-#define HAL_BOARD_TERRAIN_DIRECTORY "terrain"
-#define HAL_PARAM_DEFAULTS_PATH "etc/defaults.parm"
-#define HAL_INS_DEFAULT HAL_INS_HIL
-#define HAL_BARO_DEFAULT HAL_BARO_HIL
-#define HAL_COMPASS_DEFAULT HAL_COMPASS_HIL
-#define HAL_GPIO_A_LED_PIN        61
-#define HAL_GPIO_B_LED_PIN        48
-#define HAL_GPIO_C_LED_PIN        117
-#define HAL_GPIO_LED_ON           LOW
-#define HAL_GPIO_LED_OFF          HIGH
-
+    #include <AP_HAL/board/sitl.h>
 #elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
-#define HAL_BOARD_NAME "PX4"
-#define HAL_CPU_CLASS HAL_CPU_CLASS_150
-#define HAL_OS_POSIX_IO 1
-#define HAL_BOARD_LOG_DIRECTORY "/fs/microsd/APM/LOGS"
-#define HAL_BOARD_TERRAIN_DIRECTORY "/fs/microsd/APM/TERRAIN"
-#define HAL_PARAM_DEFAULTS_PATH "/etc/defaults.parm"
-#define HAL_INS_DEFAULT HAL_INS_PX4
-#define HAL_BARO_DEFAULT HAL_BARO_PX4
-#define HAL_COMPASS_DEFAULT HAL_COMPASS_PX4
-#define HAL_SERIAL0_BAUD_DEFAULT 115200
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_PX4_V1
-#define HAL_STORAGE_SIZE            8192
-#else
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_PX4_V2
-#define HAL_STORAGE_SIZE            16384
-#define HAL_HAVE_IMU_HEATER         1 // for Pixhawk2
-#define HAL_IMU_TEMP_DEFAULT       -1 // disabled
-#endif
-#define HAL_GPIO_A_LED_PIN        27
-#define HAL_GPIO_B_LED_PIN        26
-#define HAL_GPIO_C_LED_PIN        25
-#define HAL_GPIO_LED_ON           LOW
-#define HAL_GPIO_LED_OFF          HIGH
-
+    #include <AP_HAL/board/px4.h>
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
+<<<<<<< HEAD
 #define HAL_BOARD_NAME "Linux"
 #define HAL_CPU_CLASS HAL_CPU_CLASS_1000
 #define HAL_OS_POSIX_IO 1
@@ -471,73 +439,15 @@
 #define HAL_OPTFLOW_PX4FLOW_I2C_BUS 1
 #endif
 
+=======
+    #include <AP_HAL/board/linux.h>
+>>>>>>> 031166f64d2e4a781ab455b56a6123229785b8a0
 #elif CONFIG_HAL_BOARD == HAL_BOARD_EMPTY
-#define HAL_BOARD_NAME "EMPTY"
-#define HAL_CPU_CLASS HAL_CPU_CLASS_16
-#define HAL_STORAGE_SIZE            4096
-#define HAL_STORAGE_SIZE_AVAILABLE  HAL_STORAGE_SIZE
-#define HAL_INS_DEFAULT HAL_INS_HIL
-#define HAL_BARO_DEFAULT HAL_BARO_HIL
-#define HAL_COMPASS_DEFAULT HAL_COMPASS_HIL
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_NONE
-
+    #include <AP_HAL/board/empty.h>
 #elif CONFIG_HAL_BOARD == HAL_BOARD_QURT
-#define AP_HAL_BOARD_DRIVER AP_HAL_QURT
-#define HAL_BOARD_NAME "QURT"
-#define HAL_CPU_CLASS HAL_CPU_CLASS_1000
-#define HAL_STORAGE_SIZE            16384
-#define HAL_STORAGE_SIZE_AVAILABLE  HAL_STORAGE_SIZE
-#define HAL_INS_DEFAULT HAL_INS_QURT
-#define HAL_BARO_DEFAULT HAL_BARO_QURT
-#define HAL_COMPASS_DEFAULT HAL_COMPASS_QURT
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_NONE
-#define HAL_BOARD_LOG_DIRECTORY "/dev/fs/logs"
-#define HAL_OS_POSIX_IO 1
-#define HAL_SERIAL0_BAUD_DEFAULT 115200
-
+    #include <AP_HAL/board/qurt.h>
 #elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
-#define HAL_BOARD_NAME "VRBRAIN"
-#define HAL_CPU_CLASS HAL_CPU_CLASS_150
-#define HAL_OS_POSIX_IO 1
-#define HAL_BOARD_LOG_DIRECTORY "/fs/microsd/APM/LOGS"
-#define HAL_BOARD_TERRAIN_DIRECTORY "/fs/microsd/APM/TERRAIN"
-#define HAL_PARAM_DEFAULTS_PATH "/etc/defaults.parm"
-#define HAL_INS_DEFAULT HAL_INS_VRBRAIN
-#define HAL_BARO_DEFAULT HAL_BARO_VRBRAIN
-#define HAL_COMPASS_DEFAULT HAL_COMPASS_VRBRAIN
-#define HAL_SERIAL0_BAUD_DEFAULT 115200
-#if  defined(CONFIG_ARCH_BOARD_VRBRAIN_V45)
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_VRBRAIN_V45
-#define HAL_STORAGE_SIZE            8192
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V51)
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_VRBRAIN_V51
-#define HAL_STORAGE_SIZE            16384
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V52)
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_VRBRAIN_V52
-#define HAL_STORAGE_SIZE            16384
-#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51)
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_VRUBRAIN_V51
-#define HAL_STORAGE_SIZE            8192
-#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_VRUBRAIN_V52
-#define HAL_STORAGE_SIZE            8192
-#elif defined(CONFIG_ARCH_BOARD_VRCORE_V10)
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_VRCORE_V10
-#define HAL_STORAGE_SIZE            16384
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V54)
-#define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_VRBRAIN_V54
-#define HAL_STORAGE_SIZE            16384
-#endif
-#define HAL_GPIO_A_LED_PIN        25
-#define HAL_GPIO_B_LED_PIN        26
-#define HAL_GPIO_C_LED_PIN        27
-#define HAL_GPIO_LED_ON           HIGH
-#define HAL_GPIO_LED_OFF          LOW
-#define EXTERNAL_LED_GPS          28    // GPS LED - AN10
-#define EXTERNAL_LED_ARMED        29    // Armed LED - AN11
-#define EXTERNAL_LED_MOTOR1       30    // Motor1 LED - AN8
-#define EXTERNAL_LED_MOTOR2       31    // Motor2 LED - AN12
-
+    #include <AP_HAL/board/vrbrain.h>
 #else
 #error "Unknown CONFIG_HAL_BOARD type"
 #endif
@@ -555,7 +465,7 @@
 #endif
 
 #ifndef HAL_PARAM_DEFAULTS_PATH
-#define HAL_PARAM_DEFAULTS_PATH NULL
+#define HAL_PARAM_DEFAULTS_PATH nullptr
 #endif
 
 #ifndef HAL_HAVE_IMU_HEATER
@@ -564,4 +474,19 @@
 
 #ifndef HAL_RANGEFINDER_LIGHTWARE_I2C_BUS
 #define HAL_RANGEFINDER_LIGHTWARE_I2C_BUS 1
+#endif
+
+#ifndef HAL_COMPASS_HMC5843_I2C_ADDR
+#define HAL_COMPASS_HMC5843_I2C_ADDR 0x1E
+#endif
+
+#ifndef HAL_WITH_UAVCAN
+#define HAL_WITH_UAVCAN 0
+#endif
+
+// this is used as a general mechanism to make a 'small' build by
+// dropping little used features. We use this to allow us to keep
+// FMUv2 going for as long as possible
+#ifndef HAL_MINIMIZE_FEATURES
+#define HAL_MINIMIZE_FEATURES       0
 #endif

@@ -1,4 +1,3 @@
-/// -- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil --
 /*
  * Copyright (C) 2016  Intel Corporation. All rights reserved.
  *
@@ -133,6 +132,7 @@ void RCOutput_AeroIO::set_freq(uint32_t chmask, uint16_t freq_hz)
     }
 
     if (!_corking) {
+        _corking = true;
         push();
     }
 }
@@ -151,6 +151,7 @@ void RCOutput_AeroIO::enable_ch(uint8_t ch)
         return;
     }
     _pending_duty_write_mask |= (1U << ch);
+    _corking = true;
     push();
 }
 
@@ -161,6 +162,7 @@ void RCOutput_AeroIO::disable_ch(uint8_t ch)
     }
     _duty_buffer[ch] = 0;
     _pending_duty_write_mask |= (1U << ch);
+    _corking = true;
     push();
 }
 
@@ -170,6 +172,7 @@ void RCOutput_AeroIO::write(uint8_t ch, uint16_t period_us)
     _duty_buffer[ch] = period_us;
 
     if (!_corking) {
+        _corking = true;
         push();
     }
 }
@@ -181,6 +184,9 @@ void RCOutput_AeroIO::cork()
 
 void RCOutput_AeroIO::push()
 {
+    if (!_corking) {
+        return;
+    }
     _corking = false;
 
     for (uint8_t i = 0; i < PWM_CHAN_COUNT; i++) {
@@ -270,12 +276,12 @@ uint16_t RCOutput_AeroIO::_usec_to_hw(uint16_t freq, uint16_t usec)
 {
     float f = freq;
     float u = usec;
-    return 0xFFFF * u * f / USEC_PER_SEC;
+    return 0xFFFF * u * f / AP_USEC_PER_SEC;
 }
 
 uint16_t RCOutput_AeroIO::_hw_to_usec(uint16_t freq, uint16_t hw_val)
 {
     float p = hw_val;
     float f = freq;
-    return p * USEC_PER_SEC / (0xFFFF * f);
+    return p * AP_USEC_PER_SEC / (0xFFFF * f);
 }

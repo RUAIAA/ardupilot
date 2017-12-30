@@ -60,4 +60,9 @@ public:
        optional function to stop clock at a given time, used by log replay
      */
     virtual void     stop_clock(uint64_t time_usec) {}
+
+    virtual bool     in_main_thread() const = 0;
+
+    virtual void create_uavcan_thread() {};
+
 };

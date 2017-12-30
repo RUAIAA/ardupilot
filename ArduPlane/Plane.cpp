@@ -1,4 +1,3 @@
-/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -22,7 +21,7 @@ const AP_HAL::HAL& hal = AP_HAL::get_HAL();
   constructor for main Plane class
  */
 Plane::Plane(void)
-    : DataFlash{FIRMWARE_STRING}
+    : DataFlash{FIRMWARE_STRING, g.log_bitmask}
 {
     // C++11 doesn't allow in-class initialisation of bitfields
     auto_state.takeoff_complete = true;
