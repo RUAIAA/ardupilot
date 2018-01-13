@@ -876,6 +876,8 @@ private:
     float rangefinder_correction(void);
     void rangefinder_height_update(void);
     void set_next_WP(const struct Location &loc);
+    void set_injection_WP(const struct Location &loc);
+    void set_WP(const struct Location &loc, bool set_prev);
     void set_guided_WP(void);
     void init_home();
     void update_home();
@@ -1071,6 +1073,7 @@ private:
     bool verify_command(const AP_Mission::Mission_Command& cmd);
     void do_takeoff(const AP_Mission::Mission_Command& cmd);
     void do_nav_wp(const AP_Mission::Mission_Command& cmd);
+    void do_nav_wp_inj(const AP_Mission::Mission_Command& cmd);
     void do_land(const AP_Mission::Mission_Command& cmd);
     void loiter_set_direction_wp(const AP_Mission::Mission_Command& cmd);
     void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);

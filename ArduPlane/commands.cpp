@@ -4,10 +4,20 @@
 
 #include "Plane.h"
 
+/// set_injection_WP - sets next WP but doesn't override prev waypoint
+void Plane::set_injection_WP(const struct Location &loc){
+  set_WP(loc,false);
+}
+
+/// set_next_WP - sets next WP but does override prev waypoint
+void Plane::set_next_WP(const struct Location &loc){
+  set_WP(loc,true);
+}
+
 /*
  *  set_next_WP - sets the target location the vehicle should fly to
  */
-void Plane::set_next_WP(const struct Location &loc)
+void Plane::set_WP(const struct Location &loc, bool set_prev)
 {
     if (auto_state.next_wp_no_crosstrack) {
         // we should not try to cross-track for this waypoint
@@ -17,7 +27,9 @@ void Plane::set_next_WP(const struct Location &loc)
         auto_state.no_crosstrack = true;
     } else {
         // copy the current WP into the OldWP slot
-        prev_WP_loc = next_WP_loc;
+        if (set_prev) {
+            prev_WP_loc = next_WP_loc;
+        }
         auto_state.no_crosstrack = false;
     }
 

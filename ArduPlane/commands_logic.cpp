@@ -50,6 +50,9 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         do_takeoff(cmd);
         break;
 
+    case MAV_CMD_INJECT_WAYPOINT:
+        do_nav_wp_inj(cmd);
+        break;
     case MAV_CMD_NAV_WAYPOINT:                  // Navigate to Waypoint
         do_nav_wp(cmd);
         break;
@@ -251,12 +254,13 @@ bool Plane::verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
         }
         return verify_takeoff();
 
+    case MAV_CMD_INJECT_WAYPOINT:
     case MAV_CMD_NAV_WAYPOINT:
         return verify_nav_wp(cmd);
 
     case MAV_CMD_NAV_LAND:
         if (quadplane.is_vtol_land(cmd.id)) {
-            return quadplane.verify_vtol_land();            
+            return quadplane.verify_vtol_land();
         }
         if (flight_stage == AP_Vehicle::FixedWing::FlightStage::FLIGHT_ABORT_LAND) {
             return landing.verify_abort_landing(prev_WP_loc, next_WP_loc, current_loc, auto_state.takeoff_altitude_rel_cm, throttle_suppressed);
@@ -394,6 +398,11 @@ void Plane::do_takeoff(const AP_Mission::Mission_Command& cmd)
 void Plane::do_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
     set_next_WP(cmd.content.location);
+}
+
+void Plane::do_nav_wp_inj(const AP_Mission::Mission_Command& cmd)
+{
+    set_injection_WP(cmd.content.location);
 }
 
 void Plane::do_land(const AP_Mission::Mission_Command& cmd)
