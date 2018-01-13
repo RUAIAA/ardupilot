@@ -151,8 +151,10 @@ void AP_Mission::reset()
     _flags.nav_cmd_loaded  = false;
     _flags.do_cmd_loaded   = false;
     _flags.do_cmd_all_done = false;
+    _flags.inj_cmd_loaded = false;
     _nav_cmd.index         = AP_MISSION_CMD_INDEX_NONE;
     _do_cmd.index          = AP_MISSION_CMD_INDEX_NONE;
+    _inj_cmd.index         = AP_MISSION_CMD_INDEX_NONE;
     _prev_nav_cmd_index    = AP_MISSION_CMD_INDEX_NONE;
     _prev_nav_cmd_wp_index = AP_MISSION_CMD_INDEX_NONE;
     _prev_nav_cmd_id       = AP_MISSION_CMD_ID_NONE;
@@ -170,12 +172,15 @@ bool AP_Mission::clear()
 
     // remove all commands
     _cmd_total.set_and_save(0);
+    _cmd_total_injected.set_and_save(0);
 
     // clear index to commands
     _nav_cmd.index = AP_MISSION_CMD_INDEX_NONE;
     _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
+    _inj_cmd.index = AP_MISSION_CMD_INDEX_NONE;
     _flags.nav_cmd_loaded = false;
     _flags.do_cmd_loaded = false;
+    _flags.inj_cmd_loaded = false;
 
     // return success
     return true;
@@ -185,9 +190,23 @@ bool AP_Mission::clear()
 /// trucate - truncate any mission items beyond index
 void AP_Mission::truncate(uint16_t index)
 {
-    if ((unsigned)_cmd_total > index) {        
+    if ((unsigned)_cmd_total > index) {
         _cmd_total.set_and_save(index);
     }
+    //_cmd_total_injected must be at least _cmd_total
+    // it must be initialized to _cmd_total, this also allows us to reset _cmd_total_injected
+    if ((unsigned)_cmd_total_injected != (unsigned)_cmd_total) {
+        _cmd_total_injected.set_and_save(_cmd_total);
+    }
+}
+/// reset_inj - clears injection commands from memory
+void AP_Mission::reset_inj()
+{
+    _flags.inj_cmd_loaded = false;
+    //wipe all injected WPs
+    _inj_cmd.index = AP_MISSION_CMD_INDEX_NONE;
+    //decrease mission size and remove injected waypoints
+    truncate(_cmd_total);
 }
 
 /// update - ensures the command queues are loaded with the next command and calls main programs command_init and command_verify functions to progress the mission
@@ -208,15 +227,34 @@ void AP_Mission::update()
             return;
         }
     }else{
+        ///State-machine for waypoint injection
         // run the active nav command
-        if (_cmd_verify_fn(_nav_cmd)) {
-            // market _nav_cmd as complete (it will be started on the next iteration)
+        // injection commands have priority
+        if (!_flags.inj_cmd_loaded && _cmd_verify_fn(_nav_cmd)) {
             _flags.nav_cmd_loaded = false;
             // immediately advance to the next mission command
             if (!advance_current_nav_cmd()) {
                 // failure to advance nav command means mission has completed
                 complete();
                 return;
+            }
+            // we got to an actual mission waypoint
+            // injection commands prior to this are cleared
+            if (_inj_cmd.index != AP_MISSION_CMD_INDEX_NONE) {
+                reset_inj();
+            }
+        }
+        //look for an injected command if we don't have one
+        if ( !_flags.do_cmd_loaded && (!_flags.inj_cmd_loaded || _inj_cmd.index == AP_MISSION_CMD_INDEX_NONE)) {
+            advance_current_inj_cmd();
+        }else if (!_flags.do_cmd_loaded && (_flags.inj_cmd_loaded && _cmd_verify_fn(_inj_cmd))) {
+            _flags.inj_cmd_loaded = false;
+            if (!advance_current_inj_cmd()) {
+                // restore old waypoint
+                // if the radii of thelast injection waypoint hit and this nav waypoint intersected
+                // this will be accounted for next time update is called which will cause the vehicle
+                // to proceed to the next NAV_CMD
+                _cmd_start_fn(_nav_cmd);
             }
         }
     }
@@ -251,10 +289,30 @@ bool AP_Mission::add_cmd(Mission_Command& cmd)
         // increment total number of commands
         _cmd_total.set_and_save(_cmd_total + 1);
     }
+    //need to make sure the two totals are synced
+    if(_cmd_total > _cmd_total_injected){
+        _cmd_total_injected.set_and_save(_cmd_total);
+    }
 
     return ret;
 }
 
+/// inject_cmd: for MAV_CMD_INJECT_*
+///     returns true if successfully added, false on failure
+///     cmd.index is updated with it's new position in the mission
+///     _nav_inj_cmd.index is updated with the first injected wp if it was AP_MISSION_CMD_ID_NONE before
+bool AP_Mission::inject_cmd(Mission_Command& cmd)
+{
+    //we now have an injected wp. This notifys update of it.
+    bool ret = write_cmd_to_storage(_cmd_total_injected,cmd);
+
+    if (ret) {
+        cmd.index = _cmd_total_injected;
+        _cmd_total_injected.set_and_save(_cmd_total_injected + 1);
+    }
+
+    return ret;
+}
 /// replace_cmd - replaces the command at position 'index' in the command list with the provided cmd
 ///     replacing the current active command will have no effect until the command is restarted
 ///     returns true if successfully replaced, false on failure
@@ -269,12 +327,35 @@ bool AP_Mission::replace_cmd(uint16_t index, Mission_Command& cmd)
     return write_cmd_to_storage(index, cmd);
 }
 
+/// replace_inject_cmd - replaces the injection command at position 'index' in the command list with the provided cmd
+///     replacing the current active command will have no effect until the command is restarted
+///     returns true if successfully replaced, false on failure
+bool AP_Mission::replace_inject_cmd(uint16_t index, Mission_Command& cmd)
+{
+    // sanity check index
+    // we are not allowed to inject waypoints to replace mission wp
+    if (index < (unsigned)_cmd_total) {
+        return false;
+    }
+    // sanity check: can't look beyond total number of injection wp's
+    if(index >= (unsigned)_cmd_total_injected){
+        return false;
+    }
+
+    // attempt to write the command to storage
+    return write_cmd_to_storage(index, cmd);
+}
 /// is_nav_cmd - returns true if the command's id is a "navigation" command, false if "do" or "conditional" command
 bool AP_Mission::is_nav_cmd(const Mission_Command& cmd)
 {
     return (cmd.id <= MAV_CMD_NAV_LAST);
 }
 
+// is_inj_cmd - returns true if the command's id is a "Injection" command, false if anything else...
+bool AP_Mission::is_inj_cmd(const Mission_Command& cmd)
+{
+    return (cmd.id >= MAV_CMD_INJECT_WAYPOINT && cmd.id <= MAV_CMD_INJECT_LAST);
+}
 /// get_next_nav_cmd - gets next "navigation" command found at or after start_index
 ///     returns true if found, false if not found (i.e. reached end of mission command list)
 ///     accounts for do_jump commands but never increments the jump's num_times_run (advance_current_nav_cmd is responsible for this)
@@ -433,7 +514,7 @@ bool AP_Mission::set_current_cmd(uint16_t index)
 bool AP_Mission::read_cmd_from_storage(uint16_t index, Mission_Command& cmd) const
 {
     // exit immediately if index is beyond last command but we always let cmd #0 (i.e. home) be read
-    if (index >= (unsigned)_cmd_total && index != 0) {
+    if (index >= (unsigned)_cmd_total_injected && index != 0) {
         return false;
     }
 
@@ -528,7 +609,10 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
     case 0:
         // this is reserved for storing 16 bit command IDs
         return MAV_MISSION_INVALID;
-        
+
+    //all of the params are really the same, we just need this id to make certain actions later
+    //i.e distinguish injected waypoints from mission waypoints
+    case MAV_CMD_INJECT_WAYPOINT:                // MAV ID: 34
     case MAV_CMD_NAV_WAYPOINT:                          // MAV ID: 16
     {
         copy_location = true;
@@ -1410,6 +1494,59 @@ void AP_Mission::advance_current_do_cmd()
     }
 }
 
+
+/// advance_current_inj_cmd - moves current inj command forward
+///     we need to treat inj commands separately since they are ammended
+///     to the end of the mission
+bool AP_Mission::advance_current_inj_cmd()
+{
+    Mission_Command cmd;
+    uint16_t cmd_index;
+
+    // exit immediately if we're not running
+    if (_flags.state != MISSION_RUNNING) {
+        return false;
+    }
+
+    // exit immediately if current nav command has not completed
+    if (_flags.inj_cmd_loaded) {
+        return false;
+    }
+
+    // stop the current running do command
+    // #NOTE :this is probably necessary
+    _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
+    _flags.do_cmd_loaded = false;
+    _flags.do_cmd_all_done = false;
+
+    // get starting point for search
+    cmd_index = _inj_cmd.index;
+    if (cmd_index == AP_MISSION_CMD_INDEX_NONE) {
+        // start from beginning of the injected command list (end of mission list)
+        cmd_index = _cmd_total;
+    }else{
+        // start from one position past the current nav command
+        cmd_index++;
+    }
+
+    if (cmd_index >= (unsigned)_cmd_total_injected || !read_cmd_from_storage(cmd_index, cmd)) {
+        // this should never happen because of check above but just in case
+        return false;
+    }
+    //if we came here it's because there is an injection command
+    //this is because once all injection commands are complete they are cleared so this must return true
+    if (is_inj_cmd(cmd)) {
+        // set current injection command and start it
+        _inj_cmd = cmd;
+        _flags.inj_cmd_loaded = true;
+        _cmd_start_fn(_inj_cmd);
+    } else{
+        return false;
+    }
+
+    // if we got this far we must have successfully advanced the inj command
+    return true;
+}
 /// get_next_cmd - gets next command found at or after start_index
 ///     returns true if found, false if not found (i.e. mission complete)
 ///     accounts for do_jump commands

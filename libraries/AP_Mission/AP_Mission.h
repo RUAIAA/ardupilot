@@ -297,6 +297,9 @@ public:
     ///                 this number includes offset 0, the home location
     uint16_t num_commands() const { return _cmd_total; }
 
+    /// num_commands_with_injected - returns total number of commands in the mission including injected
+    ///                 this number includes offset 0, the home location
+    uint16_t num_commands_with_injected() const { return _cmd_total_injected; }
     /// num_commands_max - returns maximum number of commands that can be stored
     uint16_t num_commands_max() const;
 
@@ -340,13 +343,22 @@ public:
     ///     cmd.index is updated with it's new position in the mission
     bool add_cmd(Mission_Command& cmd);
 
+    /// inject_wp - adds injected cmd to the end of the command list and writes to storage
+    /// in addition, it sets _nav_cmd_inj
+    bool inject_cmd(Mission_Command& cmd);
     /// replace_cmd - replaces the command at position 'index' in the command list with the provided cmd
     ///     replacing the current active command will have no effect until the command is restarted
     ///     returns true if successfully replaced, false on failure
     bool replace_cmd(uint16_t index, Mission_Command& cmd);
 
+    /// replace_inject_cmd - replaces the injection command at position 'index' in the command list with the provided cmd
+    ///     replacing the current active command will have no effect until the command is restarted
+    ///     returns true if successfully replaced, false on failure
+    bool replace_inject_cmd(uint16_t index,Mission_Command& cmd);
     /// is_nav_cmd - returns true if the command's id is a "navigation" command, false if "do" or "conditional" command
     static bool is_nav_cmd(const Mission_Command& cmd);
+    /// is_nav_cmd - returns true if the command's id is a "navigation" command, false if anything else
+    static bool is_inj_cmd(const Mission_Command& cmd);
 
     /// get_current_nav_cmd - returns the current "navigation" command
     const Mission_Command& get_current_nav_cmd() const { return _nav_cmd; }
@@ -439,6 +451,7 @@ private:
         uint8_t nav_cmd_loaded  : 1; // true if a "navigation" command has been loaded into _nav_cmd
         uint8_t do_cmd_loaded   : 1; // true if a "do"/"conditional" command has been loaded into _do_cmd
         uint8_t do_cmd_all_done : 1; // true if all "do"/"conditional" commands have been completed (stops unnecessary searching through eeprom for do commands)
+        uint8_t inj_cmd_loaded  : 1; // true if an "injection" commmand has been loaded into _inj_cmd
     } _flags;
 
     ///
@@ -448,12 +461,18 @@ private:
     /// complete - mission is marked complete and clean-up performed including calling the mission_complete_fn
     void complete();
 
+    /// reset_inj - wipe all pending injection commands
+    void reset_inj();
     /// advance_current_nav_cmd - moves current nav command forward
     ///     do command will also be loaded
     ///     accounts for do-jump commands
     //      returns true if command is advanced, false if failed (i.e. mission completed)
     bool advance_current_nav_cmd();
 
+    /// advance_current_inj_cmd - moves current inj command forward
+    ///     we need to treat inj commands separately since they are ammended
+    ///     to the end of the mission
+    bool advance_current_inj_cmd();
     /// advance_current_do_cmd - moves current do command forward
     ///     accounts for do-jump commands
     ///     returns true if successfully advanced (can it ever be unsuccessful?)
@@ -494,6 +513,7 @@ private:
     // parameters
     AP_Int16                _cmd_total;  // total number of commands in the mission
     AP_Int8                 _restart;   // controls mission starting point when entering Auto mode (either restart from beginning of mission or resume from last command run)
+    AP_Int16                _cmd_total_injected; //keeps track of the extended mission including injected cmds
 
     // pointer to main program functions
     mission_cmd_fn_t        _cmd_start_fn;  // pointer to function which will be called when a new command is started
@@ -503,6 +523,7 @@ private:
     // internal variables
     struct Mission_Command  _nav_cmd;   // current "navigation" command.  It's position in the command list is held in _nav_cmd.index
     struct Mission_Command  _do_cmd;    // current "do" command.  It's position in the command list is held in _do_cmd.index
+    struct Mission_Command  _inj_cmd;   // current  "injection" command. Position in the command list.
     uint16_t                _prev_nav_cmd_id;       // id of the previous "navigation" command. (WAYPOINT, LOITER_TO_ALT, ect etc)
     uint16_t                _prev_nav_cmd_index;    // index of the previous "navigation" command.  Rarely used which is why we don't store the whole command
     uint16_t                _prev_nav_cmd_wp_index; // index of the previous "navigation" command that contains a waypoint.  Rarely used which is why we don't store the whole command
