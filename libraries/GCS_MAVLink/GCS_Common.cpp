@@ -670,7 +670,31 @@ bool GCS_MAVLINK::handle_mission_item(mavlink_message_t *msg, AP_Mission &missio
         result = MAV_MISSION_ACCEPTED;
         goto mission_ack;
     }
-
+    //Injection Command - bypass waypoint protocol
+    if (current == 4) {
+        //can only replace injected commands
+        if (seq >= mission.num_commands() && seq < mission.num_commands_with_injected()) {
+            if (mission.replace_inject_cmd(seq,cmd)) {
+                result = MAV_MISSION_ACCEPTED;
+                goto mission_ack;
+            }else{
+                result = MAV_MISSION_ERROR;
+                goto mission_ack;
+            }
+        // if command is at the end of command list, add the command
+        } else if (seq == mission.num_commands_with_injected()) {
+            if (mission.inject_cmd(cmd)) {
+                result = MAV_MISSION_ACCEPTED;
+                goto mission_ack;
+            }else{
+                result = MAV_MISSION_ERROR;
+                goto mission_ack;
+            }
+        } else {
+            result = MAV_MISSION_ERROR;
+            goto mission_ack;
+        }
+    }
     // Check if receiving waypoints (mission upload expected)
     if (!waypoint_receiving) {
         result = MAV_MISSION_ERROR;
