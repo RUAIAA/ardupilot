@@ -416,7 +416,7 @@ void Plane::send_pid_tuning(mavlink_channel_t chan)
 
 void Plane::send_current_waypoint(mavlink_channel_t chan)
 {
-    mavlink_msg_mission_current_send(chan, mission.get_current_nav_index());
+    mavlink_msg_mission_current_send(chan, mission.get_current_nav_or_inj_index());
 }
 
 uint8_t GCS_MAVLINK_Plane::sysid_my_gcs() const
