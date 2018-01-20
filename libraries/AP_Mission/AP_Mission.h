@@ -363,11 +363,29 @@ public:
     /// get_current_nav_cmd - returns the current "navigation" command
     const Mission_Command& get_current_nav_cmd() const { return _nav_cmd; }
 
+    // get_current_inj_cmd - return the current "injection" command
+    const Mission_Command& get_current_inj_cmd() const { return _inj_cmd; }
+
+    const Mission_Command& get_current_nav_or_inj_cmd() const { return (_flags.inj_cmd_loaded == true) ? get_current_inj_cmd() : get_current_nav_cmd(); }
+
     /// get_current_nav_index - returns the current "navigation" command index
     /// Note that this will return 0 if there is no command. This is
     /// used in MAVLink reporting of the mission command
-    uint16_t get_current_nav_index() const { 
+    uint16_t get_current_nav_index() const {
         return _nav_cmd.index==AP_MISSION_CMD_INDEX_NONE?0:_nav_cmd.index; }
+
+    /// get_current_inj_index - returns the current "injection" command index
+    /// Not that this will return 0 if there is no command. This is
+    /// used in MAVLink reporting of the injected command
+    uint16_t get_current_inj_index() const {
+        return _inj_cmd.index==AP_MISSION_CMD_ID_NONE?0:_inj_cmd.index; }
+
+    /// get_current_nav_or_inj_index - return the current "injection" command if one is loaded,
+    /// else returns the current nav command. This is
+    /// used in MAVLink reporting of the injected command
+    uint16_t get_current_nav_or_inj_index() {
+        return (_flags.inj_cmd_loaded == true) ? get_current_inj_index(): get_current_nav_index(); }
+
 
     /// get_prev_nav_cmd_id - returns the previous "navigation" command id
     ///     if there was no previous nav command it returns AP_MISSION_CMD_ID_NONE
