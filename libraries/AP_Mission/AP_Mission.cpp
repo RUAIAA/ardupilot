@@ -115,6 +115,8 @@ void AP_Mission::resume()
     if (_flags.do_cmd_loaded && _do_cmd.index != AP_MISSION_CMD_INDEX_NONE) {
         _cmd_start_fn(_do_cmd);
     }
+
+    _flags.inj_cmd_loaded = false;
 }
 
 /// check mission starts with a takeoff command
@@ -246,7 +248,7 @@ void AP_Mission::update()
         }
         //look for an injected command if we don't have one
         if (_nav_cmd.id == MAV_CMD_NAV_WAYPOINT) {
-            if ( !_flags.do_cmd_loaded && (!_flags.inj_cmd_loaded || _inj_cmd.index == AP_MISSION_CMD_INDEX_NONE)) {
+            if (!_flags.do_cmd_loaded && (!_flags.inj_cmd_loaded || _inj_cmd.index == AP_MISSION_CMD_INDEX_NONE)) {
                 advance_current_inj_cmd();
             }else if (!_flags.do_cmd_loaded && (_flags.inj_cmd_loaded && _cmd_verify_fn(_inj_cmd))) {
                 _flags.inj_cmd_loaded = false;
