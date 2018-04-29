@@ -173,7 +173,7 @@ public:
         bool cold_start; // use cold start procedure
         uint16_t height_delay_cm; // height delay for start
     };
-    
+
     union PACKED Content {
         // jump structure
         Jump_Command jump;
@@ -228,7 +228,7 @@ public:
 
         // DO_ENGINE_CONTROL
         Do_Engine_Control do_engine_control;
-        
+
         // location
         Location location;      // Waypoint location
 
@@ -276,11 +276,14 @@ public:
         // clear commands
         _nav_cmd.index = AP_MISSION_CMD_INDEX_NONE;
         _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
+        _inj_cmd.index = AP_MISSION_CMD_INDEX_NONE;
 
         // initialise other internal variables
         _flags.state = MISSION_STOPPED;
         _flags.nav_cmd_loaded = false;
         _flags.do_cmd_loaded = false;
+        _flags.inj_cmd_loaded = false;
+        _flags.inj_cmd_current_replaced = false;
     }
 
     ///
@@ -470,6 +473,7 @@ private:
         uint8_t do_cmd_loaded   : 1; // true if a "do"/"conditional" command has been loaded into _do_cmd
         uint8_t do_cmd_all_done : 1; // true if all "do"/"conditional" commands have been completed (stops unnecessary searching through eeprom for do commands)
         uint8_t inj_cmd_loaded  : 1; // true if an "injection" commmand has been loaded into _inj_cmd
+        uint8_t inj_cmd_current_replaced: 1; //true if the current "injection" command has been replaced
     } _flags;
 
     ///

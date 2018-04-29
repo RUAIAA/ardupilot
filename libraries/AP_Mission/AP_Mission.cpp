@@ -154,6 +154,7 @@ void AP_Mission::reset()
     _flags.do_cmd_loaded   = false;
     _flags.do_cmd_all_done = false;
     _flags.inj_cmd_loaded = false;
+    _flags.inj_cmd_current_replaced = false;
     _nav_cmd.index         = AP_MISSION_CMD_INDEX_NONE;
     _do_cmd.index          = AP_MISSION_CMD_INDEX_NONE;
     _inj_cmd.index         = AP_MISSION_CMD_INDEX_NONE;
@@ -205,6 +206,7 @@ void AP_Mission::truncate(uint16_t index)
 void AP_Mission::reset_inj()
 {
     _flags.inj_cmd_loaded = false;
+    _flags.inj_cmd_current_replaced = false;
     //wipe all injected WPs
     _inj_cmd.index = AP_MISSION_CMD_INDEX_NONE;
     //decrease mission size and remove injected waypoints
@@ -259,6 +261,14 @@ void AP_Mission::update()
                     // to proceed to the next NAV_CMD
                     _cmd_start_fn(_nav_cmd);
                 }
+            // the current injection command was replaced
+            } else if (!_flags.do_cmd_loaded && (_flags.inj_cmd_loaded && _flags.inj_cmd_current_replaced)) {
+                Mission_Command cmd;
+                if(read_cmd_from_storage(_inj_cmd.index, cmd)) {
+                    _inj_cmd = cmd;
+                    _cmd_start_fn(_inj_cmd);
+                }
+                _flags.inj_cmd_current_replaced = false;
             }
         }
     }
@@ -344,6 +354,10 @@ bool AP_Mission::replace_inject_cmd(uint16_t index, Mission_Command& cmd)
     // sanity check: can't look beyond total number of injection wp's
     if(index >= (unsigned)_cmd_total_injected){
         return false;
+    }
+
+    if (cmd.id == _inj_cmd.index) {
+        _flags.inj_cmd_current_replaced = true;
     }
 
     // attempt to write the command to storage
