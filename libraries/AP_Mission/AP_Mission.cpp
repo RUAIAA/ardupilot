@@ -356,7 +356,8 @@ bool AP_Mission::replace_inject_cmd(uint16_t index, Mission_Command& cmd)
         return false;
     }
 
-    if (cmd.id == _inj_cmd.index) {
+    if (index == _inj_cmd.index) {
+
         _flags.inj_cmd_current_replaced = true;
     }
 
