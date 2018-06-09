@@ -37,6 +37,12 @@ void Plane::failsafe_check(void)
         in_failsafe = true;
     }
 
+    if(auvsi.should_death_spiral()){
+        gcs().send_text(MAV_SEVERITY_EMERGENCY,"#YOLO, Good-bye from failsafe");
+        afs.terminate_vehicle();
+        return;
+    }
+
     if (in_failsafe && tnow - last_timestamp > 20000) {
         last_timestamp = tnow;
 
@@ -62,7 +68,7 @@ void Plane::failsafe_check(void)
         if (!hal.util->get_soft_armed()) {
             throttle = 0;
         }
-        
+
         // setup secondary output channels that don't have
         // corresponding input channels
         SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, roll);
@@ -71,13 +77,15 @@ void Plane::failsafe_check(void)
         SRV_Channels::set_output_scaled(SRV_Channel::k_steering, rudder);
         SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, throttle);
 
-        // this is to allow the failsafe module to deliberately crash 
+        // this is to allow the failsafe module to deliberately crash
         // the plane. Only used in extreme circumstances to meet the
         // OBC rules
         if (afs.should_crash_vehicle()) {
             afs.terminate_vehicle();
             return;
         }
+
+
 
         // setup secondary output channels that do have
         // corresponding input channels

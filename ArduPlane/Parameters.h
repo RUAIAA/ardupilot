@@ -97,7 +97,7 @@ public:
         k_param_skip_gyro_cal, // unused
         k_param_auto_fbw_steer,
         k_param_waypoint_max_radius,
-        k_param_ground_steer_alt,        
+        k_param_ground_steer_alt,
         k_param_ground_steer_dps,
         k_param_rally_limit_km_old, //unused anymore -- just holding this index
         k_param_hil_err_limit,
@@ -231,7 +231,8 @@ public:
         //
         k_param_camera = 160,
         k_param_camera_mount,
-        k_param_camera_mount2,      // unused
+        //k_param_camera_mount2,      // unused
+        k_param_auvsi,
         k_param_adsb,
         k_param_notify,
         k_param_land_pre_flare_sec = 165,   // unused - moved to AP_Landing
@@ -478,7 +479,7 @@ public:
     AP_Int8 flap_1_speed;
     AP_Int8 flap_2_percent;
     AP_Int8 flap_2_speed;
-    AP_Int8 takeoff_flap_percent;  
+    AP_Int8 takeoff_flap_percent;
     AP_Int8 inverted_flight_ch;             // 0=disabled, 1-8 is channel for inverted flight trigger
     AP_Int8 stick_mixing;
     AP_Float takeoff_throttle_min_speed;
@@ -529,13 +530,13 @@ public:
 
     // RC input channels
     RC_Channels rc_channels;
-    
+
     // control over servo output ranges
     SRV_Channels servo_channels;
 
     // whether to enforce acceptance of packets only from sysid_my_gcs
     AP_Int8 sysid_enforce;
-    
+
     // ArduSoar parameters
     SoaringController soaring_controller;
 

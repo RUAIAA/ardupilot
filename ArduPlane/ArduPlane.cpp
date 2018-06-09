@@ -1,6 +1,6 @@
 /*
    Lead developer: Andrew Tridgell
- 
+
    Authors:    Doug Weibel, Jose Julio, Jordi Munoz, Jason Short, Randy Mackay, Pat Hickey, John Arne Birkeland, Olivier Adler, Amilcar Lucas, Gregory Fletcher, Paul Riseborough, Brandon Jones, Jon Challinger
    Thanks to:  Chris Anderson, Michael Oborne, Paul Mather, Bill Premerlani, James Cohen, JB from rotorFX, Automatik, Fefenin, Peter Meister, Remzibi, Yury Smirnov, Sandro Benigno, Max Levine, Roberto Navoni, Lorenz Meier, Yury MonZon
 
@@ -83,7 +83,33 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(avoidance_adsb_update,  10,    100),
     SCHED_TASK(button_update,           5,    100),
     SCHED_TASK(stats_update,            1,    100),
+    SCHED_TASK(gcs_send_auvsi_status,   .1,   400),
+    SCHED_TASK(check_auvsi_rtl,         10,   100),
 };
+
+//AUVSI FAILSAFE
+void Plane::check_auvsi_rtl(void){
+   if(auvsi.rtl_check(failsafe.last_heartbeat_ms,failsafe.AFS_last_valid_rc_ms)){
+       set_mode(RTL,MODE_REASON_DUAL_FAILSAFE);
+   }
+}
+
+//AUVSI FAILSAFE
+void Plane::gcs_send_auvsi_status(void){
+
+
+   if(auvsi.is_man_enabled()){
+            gcs().send_text(MAV_SEVERITY_WARNING,"MANUAL TERM ENABLED");
+   } else{
+            gcs().send_text(MAV_SEVERITY_WARNING,"MANUAL TERM DISABLED");
+   }
+
+   if(auvsi.is_auto_enabled()){
+           gcs().send_text(MAV_SEVERITY_WARNING,"AUTO TERM ENABLED");
+   } else{
+           gcs().send_text(MAV_SEVERITY_WARNING,"AUTO TERM DISABLED");
+   }
+}
 
 /*
   update AP_Stats
@@ -94,7 +120,7 @@ void Plane::stats_update(void)
 }
 
 
-void Plane::setup() 
+void Plane::setup()
 {
     cliSerial = hal.console;
 
@@ -250,7 +276,7 @@ void Plane::compass_accumulate(void)
 {
     if (g.compass_enabled) {
         compass.accumulate();
-    }    
+    }
 }
 
 /*
@@ -284,7 +310,7 @@ void Plane::update_logging2(void)
 {
     if (should_log(MASK_LOG_CTUN))
         Log_Write_Control_Tuning();
-    
+
     if (should_log(MASK_LOG_NTUN))
         Log_Write_Nav_Tuning();
 
@@ -303,6 +329,8 @@ void Plane::afs_fs_check(void)
 {
     // perform AFS failsafe checks
     afs.check(failsafe.last_heartbeat_ms, geofence_breached(), failsafe.AFS_last_valid_rc_ms);
+
+    auvsi.auto_check(failsafe.last_heartbeat_ms,failsafe.AFS_last_valid_rc_ms);
 }
 
 
@@ -357,11 +385,11 @@ void Plane::one_second_loop()
         gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
             last_home_update_ms = gps.last_message_time_ms();
             update_home();
-            
+
             // reset the landing altitude correction
             landing.alt_offset = 0;
     }
-    
+
     // update error mask of sensors and subsystems. The mask uses the
     // MAV_SYS_STATUS_* values from mavlink. If a bit is set then it
     // indicates that the sensor or subsystem is present but not
@@ -421,9 +449,9 @@ void Plane::airspeed_ratio_update(void)
         gps.status() < AP_GPS::GPS_OK_FIX_3D ||
         gps.ground_speed() < 4) {
         // don't calibrate when not moving
-        return;        
+        return;
     }
-    if (airspeed.get_airspeed() < aparm.airspeed_min && 
+    if (airspeed.get_airspeed() < aparm.airspeed_min &&
         gps.ground_speed() < (uint32_t)aparm.airspeed_min) {
         // don't calibrate when flying below the minimum airspeed. We
         // check both airspeed and ground speed to catch cases where
@@ -489,7 +517,7 @@ void Plane::update_GPS_10Hz(void)
 
                 // set system clock for log timestamps
                 uint64_t gps_timestamp = gps.time_epoch_usec();
-                
+
                 hal.util->set_system_clock(gps_timestamp);
 
                 // update signing timestamp
@@ -548,7 +576,7 @@ void Plane::handle_auto_mode(void)
     } else if (nav_cmd_id == MAV_CMD_NAV_LAND) {
         calc_nav_roll();
         calc_nav_pitch();
-        
+
         // allow landing to restrict the roll limits
         nav_roll_cd = landing.constrain_roll(nav_roll_cd, g.level_roll_limit*100UL);
 
@@ -571,7 +599,7 @@ void Plane::handle_auto_mode(void)
 }
 
 /*
-  main flight mode dependent update code 
+  main flight mode dependent update code
  */
 void Plane::update_flight_mode(void)
 {
@@ -597,7 +625,7 @@ void Plane::update_flight_mode(void)
         ahrs.set_fly_forward(true);
     }
 
-    switch (effective_mode) 
+    switch (effective_mode)
     {
     case AUTO:
         handle_auto_mode();
@@ -617,23 +645,23 @@ void Plane::update_flight_mode(void)
         calc_nav_pitch();
         calc_throttle();
         break;
-        
+
     case TRAINING: {
         training_manual_roll = false;
         training_manual_pitch = false;
         update_load_factor();
-        
+
         // if the roll is past the set roll limit, then
         // we set target roll to the limit
         if (ahrs.roll_sensor >= roll_limit_cd) {
             nav_roll_cd = roll_limit_cd;
         } else if (ahrs.roll_sensor <= -roll_limit_cd) {
-            nav_roll_cd = -roll_limit_cd;                
+            nav_roll_cd = -roll_limit_cd;
         } else {
             training_manual_roll = true;
             nav_roll_cd = 0;
         }
-        
+
         // if the pitch is past the set pitch limits, then
         // we set target pitch to the limit
         if (ahrs.pitch_sensor >= aparm.pitch_limit_max_cd) {
@@ -708,7 +736,7 @@ void Plane::update_flight_mode(void)
         update_load_factor();
         update_fbwb_speed_height();
         break;
-        
+
     case CRUISE:
         /*
           in CRUISE mode we use the navigation code to control
@@ -718,8 +746,8 @@ void Plane::update_flight_mode(void)
         if (channel_roll->get_control_in() != 0 || channel_rudder->get_control_in() != 0) {
             cruise_state.locked_heading = false;
             cruise_state.lock_timer_ms = 0;
-        }                 
-        
+        }
+
         if (!cruise_state.locked_heading) {
             nav_roll_cd = channel_roll->norm_input() * roll_limit_cd;
             nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
@@ -729,13 +757,13 @@ void Plane::update_flight_mode(void)
         }
         update_fbwb_speed_height();
         break;
-        
+
     case STABILIZE:
         nav_roll_cd        = 0;
         nav_pitch_cd       = 0;
         // throttle is passthrough
         break;
-        
+
     case CIRCLE:
         // we have no GPS installed and have lost radio contact
         // or we just want to fly around in a gentle circle w/o GPS,
@@ -779,7 +807,7 @@ void Plane::update_flight_mode(void)
         }
         break;
     }
-        
+
     case INITIALISING:
         // handled elsewhere
         break;
@@ -796,14 +824,14 @@ void Plane::update_navigation()
     if (qrtl_radius == 0) {
         qrtl_radius = abs(aparm.loiter_radius);
     }
-    
+
     switch(control_mode) {
     case AUTO:
         if (home_is_set != HOME_UNSET) {
             mission.update();
         }
         break;
-            
+
     case RTL:
         if (quadplane.available() && quadplane.rtl_mode == 1 &&
             (nav_controller->reached_loiter_target() ||
@@ -819,7 +847,7 @@ void Plane::update_navigation()
             break;
         } else if (g.rtl_autoland == 1 &&
             !auto_state.checked_for_autoland &&
-            reached_loiter_target() && 
+            reached_loiter_target() &&
             labs(altitude_error_cm) < 1000) {
             // we've reached the RTL point, see if we have a landing sequence
             if (mission.jump_to_landing_sequence()) {
@@ -916,17 +944,17 @@ void Plane::update_alt()
     } else if (gps.status() >= AP_GPS::GPS_OK_FIX_3D && gps.have_vertical_velocity()) {
         sink_rate = gps.velocity().z;
     } else {
-        sink_rate = -barometer.get_climb_rate();        
+        sink_rate = -barometer.get_climb_rate();
     }
 
     // low pass the sink rate to take some of the noise out
     auto_state.sink_rate = 0.8f * auto_state.sink_rate + 0.2f*sink_rate;
-    
+
     geofence_check(true);
 
     update_flight_stage();
 
-    if (auto_throttle_mode && !throttle_suppressed) {        
+    if (auto_throttle_mode && !throttle_suppressed) {
 
         float distance_beyond_land_wp = 0;
         if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && location_passed_point(current_loc, prev_WP_loc, next_WP_loc)) {
@@ -950,7 +978,7 @@ void Plane::update_alt()
 void Plane::update_flight_stage(void)
 {
     // Update the speed & height controller states
-    if (auto_throttle_mode && !throttle_suppressed) {        
+    if (auto_throttle_mode && !throttle_suppressed) {
         if (control_mode==AUTO) {
             if (quadplane.in_vtol_auto()) {
                 set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_VTOL);
