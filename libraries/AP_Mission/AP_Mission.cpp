@@ -100,6 +100,8 @@ void AP_Mission::resume()
         return;
     }
 
+    reset_inj();
+
     // restart active navigation command. We run these on resume()
     // regardless of whether the mission was stopped, as we may be
     // re-entering AUTO mode and the nav_cmd callback needs to be run
@@ -116,7 +118,7 @@ void AP_Mission::resume()
         _cmd_start_fn(_do_cmd);
     }
 
-    _flags.inj_cmd_loaded = false;
+    //_flags.inj_cmd_loaded = false;
 }
 
 /// check mission starts with a takeoff command
